@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Task Manager</title>
+  <style>
+    body { font-family: Arial; }
+    .board { display: flex; gap: 20px; }
+    .col { width: 30%; border: 1px solid black; padding: 10px; }
+    .task { padding: 5px; margin: 5px; border: 1px solid gray; cursor: grab; }
+  </style>
+</head>
+<body>
+
+<h2>Login</h2>
+<input id="email" placeholder="email">
+<input id="password" placeholder="password" type="password">
+<button onclick="login()">Login</button>
+
+<h2>Create Task</h2>
+<input id="title" placeholder="title">
+<button onclick="createTask()">Add</button>
+
+<div class="board">
+  <div class="col" ondrop="drop(event,'pending')" ondragover="allowDrop(event)">
+    <h3>Pending</h3>
+    <div id="pending"></div>
+  </div>
+  <div class="col" ondrop="drop(event,'in-progress')" ondragover="allowDrop(event)">
+    <h3>In Progress</h3>
+    <div id="in-progress"></div>
+  </div>
+  <div class="col" ondrop="drop(event,'completed')" ondragover="allowDrop(event)">
+    <h3>Completed</h3>
+    <div id="completed"></div>
+  </div>
+</div>
+
+<script>
+let token = "";
+
+function login() {
+  fetch("http://localhost:5000/api/login", {
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body:JSON.stringify({
+      email: email.value,
+      password: password.value
+    })
+  }).then(r=>r.json()).then(d=>{
+    token=d.token;
+    loadTasks();
+  });
+}
+
+function createTask() {
+  fetch("http://localhost:5000/api/tasks", {
+    method:"POST",
+    headers:{
+      "Content-Type":"application/json",
+      "Authorization":"Bearer "+token
+    },
+    body:JSON.stringify({ title:title.value })
+  }).then(loadTasks);
+}
+
+function loadTasks() {
+  ["pending","in-progress","completed"].forEach(c=>document.getElementById(c).innerHTML="");
+  fetch("http://localhost:5000/api/tasks", {
+    headers:{ "Authorization":"Bearer "+token }
+  }).then(r=>r.json()).then(tasks=>{
+    tasks.forEach(t=>{
+      const d=document.createElement("div");
+      d.className="task";
+      d.draggable=true;
+      d.id=t._id;
+      d.ondragstart=e=>e.dataTransfer.setData("id",t._id);
+      d.innerText=t.title;
+      document.getElementById(t.status).appendChild(d);
+    });
+  });
+}
+
+function allowDrop(e){ e.preventDefault(); }
+
+function drop(e,status){
+  const id=e.dataTransfer.getData("id");
+  fetch("http://localhost:5000/api/tasks/"+id,{
+    method:"PUT",
+    headers:{
+      "Content-Type":"application/json",
+      "Authorization":"Bearer "+token
+    },
+    body:JSON.stringify({status})
+  }).then(loadTasks);
+}
+</script>
+
+</body>
+</html>
